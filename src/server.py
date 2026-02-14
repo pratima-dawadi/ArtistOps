@@ -1,13 +1,21 @@
 import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 from src.controllers.artist import ArtistController
 from src.controllers.auth import AuthController
 from src.controllers.song import SongController
 from src.controllers.user import UserController
-from src.utils.template import render_template, parse_post_body
+from src.utils.session import (
+    SESSION_COOKIE_NAME,
+    create_session,
+    destroy_session,
+    get_session_id,
+    get_user_from_session,
+    require_login,
+)
+from src.utils.template import parse_post_body, render_template
 
 artist_controller = ArtistController()
 auth_controller = AuthController()
@@ -65,6 +73,8 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/dashboard":
+            if not require_login(self):
+                return
             tab = qs.get("tab", ["users"])[0]
 
             if tab == "users":
@@ -171,11 +181,13 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 return
 
         if path.startswith("/artists/") and path.endswith("/songs"):
+            if not require_login(self):
+                return
             artist_id = path.split("/")[2]
 
             artist = artist_controller.get_artist_by_id(artist_id)
             if not artist:
-                self.send_error(404, "Artist not found")
+                self.send_error(HTTPStatus.NOT_FOUND, "Artist not found")
                 return
 
             artist_name = artist["stage_name"]
@@ -253,25 +265,25 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         form = parse_post_body(self)
+        user = get_user_from_session(self)
 
         if path == "/register":
+            if user:
+                return self.redirect("/dashboard")
             success, result = auth_controller.register_user(form)
-
             if not success:
-                self.send_response(302)
+                self.send_response(HTTPStatus.SEE_OTHER)
                 self.send_header("Location", "/register")
                 self.end_headers()
-                self.wfile.write(
-                    f"<h3>Login Error: {result}</h3><a href='/login'>Try again</a>".encode()
-                )
                 return
-
-            self.send_response(302)
+            self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "/login")
             self.end_headers()
             return
 
         if path == "/login":
+            if user:
+                return self.redirect("/dashboard")
             success, result = auth_controller.login_user(form)
 
             if not success:
@@ -283,36 +295,70 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 )
                 return
 
-            self.send_response(302)
+            session_id = create_session(result)
+            self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "/dashboard")
+            self.send_header(
+                "Set-Cookie",
+                f"{SESSION_COOKIE_NAME}={session_id}; Path=/; HttpOnly; SameSite=Lax",
+            )
             self.end_headers()
             return
 
+        if path == "/logout":
+            session_id = get_session_id(self)
+            destroy_session(session_id)
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", "/login")
+            self.send_header(
+                "Set-Cookie",
+                f"{SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
+            )
+            self.end_headers()
+            return
+
+        if not require_login(self):
+            return
+
         if path == "/users/create":
+            if not require_login(self):
+                return
             user_controller.create_user(form)
             return self.redirect("/dashboard?tab=users")
 
         if path == "/users/delete":
+            if not require_login(self):
+                return
             user_controller.delete_user(form["id"])
             return self.redirect("/dashboard?tab=users")
 
         if path == "/users/update":
+            if not require_login(self):
+                return
             user_controller.update_user(form)
             return self.redirect("/dashboard?tab=users")
 
         if path == "/artists/create":
+            if not require_login(self):
+                return
             artist_controller.create_artist(form)
             return self.redirect("/dashboard?tab=artists")
 
         if path == "/artists/update":
+            if not require_login(self):
+                return
             artist_controller.update_artist(form)
             return self.redirect("/dashboard?tab=artists")
 
         if path == "/artists/delete":
+            if not require_login(self):
+                return
             artist_controller.delete_artist(form["id"])
             return self.redirect("/dashboard?tab=artists")
 
         if path == "/songs/create":
+            if not require_login(self):
+                return
             required_fields = ["artist_id", "title", "album_name", "genre"]
 
             for field in required_fields:
@@ -328,9 +374,13 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             return self.redirect(f"/artists/{artist_id}/songs")
 
         if path == "/songs/update":
+            if not require_login(self):
+                return
             song_controller.update_song(form)
             return self.redirect(f"/artists/{form['artist_id']}/songs")
 
         if path == "/songs/delete":
+            if not require_login(self):
+                return
             song_controller.delete_song(form["id"])
             return self.redirect(f"/artists/{form['artist_id']}/songs")

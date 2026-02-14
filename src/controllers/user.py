@@ -25,7 +25,7 @@ class UserController:
                     data["first_name"],
                     data["last_name"],
                     data["email"],
-                    data["password"],
+                    hash_password(data["password"]),
                     data["phone"],
                     data["dob"],
                     data["gender"],
