@@ -7,17 +7,16 @@ class AMSDatabase:
     DB_PATH = os.path.join(BASE_DIR, "ams.db")
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-    def __init__(self):
-        self.connection = sqlite3.connect(self.DB_PATH)
-        self.cursor = self.connection.cursor()
-        self.connection.row_factory = sqlite3.Row
-
-    def get_connection(self):
-        return self.connection
+    @classmethod
+    def get_connection(cls):
+        conn = sqlite3.connect(cls.DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
 
     def init_db(self):
-        with self.connection:
-            self.cursor.executescript(
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,

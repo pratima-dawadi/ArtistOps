@@ -11,7 +11,7 @@ def run_server():
     db.init_db()
     server_address = ("", PORT)
     server = ThreadingHTTPServer(server_address, AMSRequestHandler)
-    print(f"Application is running at http://localhost:{PORT}")
+    print(f"Application is running at http://localhost:{PORT}/login")
 
     try:
         server.serve_forever()
