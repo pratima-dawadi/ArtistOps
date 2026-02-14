@@ -11,8 +11,8 @@ def render_template(template_name, **context):
         content = f.read()
 
     for key, value in context.items():
-        placeholder = "{{ " + key + " }}"
-        content = content.replace(placeholder, str(value))
+        content = content.replace(f"{{{{{key}}}}}", str(value))
+        content = content.replace(f"{{{{ {key} }}}}", str(value))
 
     return content
 

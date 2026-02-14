@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{title}}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1 class="dashboard">ArtistOps Dashboard</h1>
+
+   <div class="header">
+ 
+        <button class="logout-btn">Logout</button>
+    </div>
+
+    <div class="nav-tabs">
+        <a href="/dashboard?tab=users" class="nav-tab {{users_active}}">Users</a>
+        <a href="/dashboard?tab=artists" class="nav-tab {{artists_active}}">Artists</a>
+    </div>
+
+    <div class="container">
+        {{content}}
+    </div>
+</body>
+</html>
