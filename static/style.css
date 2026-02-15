@@ -100,7 +100,7 @@ button:hover {
 }
 
 .logout-btn {
-    background-color: transparent;
+    background-color: #d4d2c8;
     border: 2px solid;
     padding: 0.5rem 1.5rem;
     border-radius: 4px;
@@ -380,4 +380,64 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .gender-select {
     position: relative;
+}
+
+.back-btn {
+    display: inline-block;
+    margin-top: 0.5rem;
+    color: var(--primary-teal);
+    text-decoration: none;
+}
+
+.auth-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background:
+        radial-gradient(circle at 85% 15%, rgba(13, 122, 130, 0.12), transparent 35%),
+        radial-gradient(circle at 10% 90%, rgba(13, 122, 130, 0.08), transparent 40%),
+        var(--bg-cream);
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 520px;
+    background: var(--bg-white);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: var(--shadow-md);
+    padding: 1.5rem;
+}
+
+.auth-title {
+    text-align: center;
+    color: var(--primary-teal);
+    margin-bottom: 1rem;
+}
+
+.auth-form {
+    margin-bottom: 0;
+}
+
+.auth-form .form-input,
+.auth-form .form-select {
+    margin-bottom: 0.85rem;
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: 0.9rem;
+    color: var(--text-muted);
+}
+
+.auth-link {
+    color: var(--primary-teal);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.auth-link:hover {
+    text-decoration: underline;
 }
