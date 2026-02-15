@@ -340,6 +340,45 @@ button:disabled {
     align-items: center;
 }
 
+.csv-section {
+    border: 2px solid var(--primary-teal);
+}
+
+.csv-export-wrapper {
+    display: flex;
+    justify-content: center;
+    margin: 15px 0;
+}
+
+.export-btn {
+    text-decoration: none;
+    display: inline-block;
+    padding: 10px 20px;
+}
+
+.csv-import-form {
+    max-width: 400px;
+    margin: 20px auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.csv-import-form .file-input {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background-color: #f9f9f9;
+    cursor: pointer;
+}
+
+.csv-import-form .file-input:hover {
+    border-color: #1f7a7a;
+}
+
+.csv-import-form .submit-btn {
+    width: 100%;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .header {

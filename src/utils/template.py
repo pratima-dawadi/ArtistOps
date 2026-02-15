@@ -20,8 +20,10 @@ def render_template(template_name, **context):
 def parse_post_body(handler):
     content_len = int(handler.headers.get("Content-Length", "0"))
     content_type = handler.headers.get("Content-Type", "")
-    raw = handler.rfile.read(content_len).decode("utf-8") if content_len > 0 else ""
     if "application/x-www-form-urlencoded" in content_type:
+        raw = (
+            handler.rfile.read(content_len).decode("utf-8") if content_len > 0 else ""
+        )
         parsed = parse_qs(raw)
         return {k: v[0] if v else "" for k, v in parsed.items()}
     return {}

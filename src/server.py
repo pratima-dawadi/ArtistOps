@@ -1,6 +1,9 @@
+import cgi
+import csv
 import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
+from io import StringIO
 from urllib.parse import parse_qs, urlparse
 
 from src.controllers.artist import ArtistController
@@ -252,6 +255,8 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 """
 
         create_form = ""
+        csv_controls = ""
+
         if is_manager:
             create_form = """
             <div class="content-section">
@@ -282,11 +287,25 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 </form>
             </div>
             """
+
+            csv_controls = """
+            <div class="content-section csv-section">
+                <h2 class="section-title">Artist CSV</h2>
+                <div class="csv-export-wrapper">
+                    <a href="/artists/export" class="btn btn-update export-btn">Export CSV</a>
+                </div>
+                <form method="post" action="/artists/import" enctype="multipart/form-data" class="csv-import-form">
+                    <input type="file" name="file" accept=".csv" required>
+                    <button type="submit" class="submit-btn">Import CSV</button>
+                </form>
+            </div>
+            """
         pagination = self.build_pagination("/dashboard?tab=artists", page, total_count)
         table = render_template(
             "artists_table.html",
             rows=rows,
             create_form=create_form,
+            csv_controls=csv_controls,
             pagination=pagination,
         )
         content = render_template("dashboard.html", table=table)
@@ -474,14 +493,84 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             self.send_html(html_page)
             return
 
+        if path == "/artists/export":
+            if not require_login(self):
+                return
+
+            if not self.has_role(user, Role.ARTIST_MANAGER.value):
+                return self.forbidden("Only artist_manager can export artists.")
+
+            rows = artist_controller.export_artists_csv_rows()
+
+            output = StringIO()
+            writer = csv.DictWriter(
+                output,
+                fieldnames=[
+                    "first_name",
+                    "last_name",
+                    "email",
+                    "phone",
+                    "dob",
+                    "gender",
+                    "address",
+                    "stage_name",
+                    "first_release_year",
+                    "no_of_albums_released",
+                ],
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+            csv_data = output.getvalue()
+            output.close()
+
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/csv")
+            self.send_header("Content-Disposition", "attachment; filename=artists.csv")
+            self.end_headers()
+            self.wfile.write(csv_data.encode("utf-8"))
+            return
+
         self.send_error(HTTPStatus.NOT_FOUND, "Not found")
         return
 
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
-        form = parse_post_body(self)
         user = get_user_from_session(self)
+
+        if path == "/artists/import":
+            if not require_login(self):
+                return
+            if not self.has_role(user, Role.ARTIST_MANAGER.value):
+                return self.forbidden("Only artist_manager can import artists.")
+
+            multipart_form = cgi.FieldStorage(
+                fp=self.rfile,
+                headers=self.headers,
+                environ={
+                    "REQUEST_METHOD": "POST",
+                    "CONTENT_TYPE": self.headers.get("Content-Type", ""),
+                },
+            )
+
+            if "file" not in multipart_form:
+                return self.redirect("/dashboard?tab=artists")
+
+            file_item = multipart_form["file"]
+
+            if not getattr(file_item, "filename", ""):
+                return self.redirect("/dashboard?tab=artists")
+
+            csv_bytes = file_item.file.read()
+            if not csv_bytes:
+                return self.redirect("/dashboard?tab=artists")
+
+            csv_text = csv_bytes.decode("utf-8-sig", errors="ignore")
+            rows = list(csv.DictReader(StringIO(csv_text)))
+            artist_controller.import_artists(rows)
+            return self.redirect("/dashboard?tab=artists")
+
+        form = parse_post_body(self)
 
         if path == "/register":
             if user:

@@ -113,3 +113,94 @@ class ArtistController:
         ).fetchone()
         conn.close()
         return row
+
+    @staticmethod
+    def export_artists_csv_rows():
+        conn = AMSDatabase.get_connection()
+        rows = conn.execute(
+            """
+            SELECT u.first_name, u.last_name, u.email, u.phone, u.dob, u.gender, u.address,
+                   a.stage_name, a.first_release_year, a.no_of_albums_released
+            FROM artists a
+            JOIN users u ON u.id = a.user_id
+            ORDER BY a.id DESC
+            """
+        ).fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def import_artists(rows):
+        if not rows:
+            return 0
+
+        conn = AMSDatabase.get_connection()
+        created_count = 0
+
+        try:
+            for _, row in enumerate(rows, start=1):
+                first_name = (row.get("first_name") or "").strip()
+                last_name = (row.get("last_name") or "").strip()
+                email = (row.get("email") or "").strip()
+                password = (row.get("password") or "").strip()
+                phone = (row.get("phone") or "").strip()
+                dob = (row.get("dob") or "").strip()
+                gender = (row.get("gender") or "").strip()
+                gender = gender if gender in ["m", "f", "o"] else "o"
+                address = (row.get("address") or "").strip()
+                stage_name = (row.get("stage_name") or "").strip()
+                release_year = (row.get("first_release_year") or "").strip()
+                album_count = (row.get("no_of_albums_released") or "").strip()
+
+                if not stage_name or not release_year or not album_count:
+                    continue
+
+                try:
+                    release_year = int(release_year)
+                    album_count = int(album_count)
+                except ValueError:
+                    continue
+
+                cursor = conn.execute(
+                    """
+                    INSERT INTO users
+                    (first_name, last_name, email, password_hash, phone, dob, gender, address, role, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        first_name or "Artist",
+                        last_name or "Artist",
+                        email,
+                        hash_password(password or "Import123"),
+                        phone,
+                        dob,
+                        gender,
+                        address,
+                        "artist",
+                        datetime.now(),
+                        datetime.now(),
+                    ),
+                )
+
+                conn.execute(
+                    """
+                    INSERT INTO artists
+                    (user_id, stage_name, first_release_year, no_of_albums_released, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+                    """,
+                    (
+                        cursor.lastrowid,
+                        stage_name,
+                        release_year,
+                        album_count,
+                    ),
+                )
+                created_count += 1
+
+            conn.commit()
+            return created_count
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
