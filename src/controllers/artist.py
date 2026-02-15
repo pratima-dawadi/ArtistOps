@@ -97,3 +97,12 @@ class ArtistController:
         conn.execute("DELETE FROM artists WHERE id=?", (artist_id,))
         conn.commit()
         conn.close()
+
+    @staticmethod
+    def get_artist_by_user_id(user_id):
+        conn = AMSDatabase.get_connection()
+        row = conn.execute(
+            "SELECT * FROM artists WHERE user_id=?", (user_id,)
+        ).fetchone()
+        conn.close()
+        return row

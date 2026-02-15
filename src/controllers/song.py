@@ -77,3 +77,10 @@ class SongController:
         conn.execute("DELETE FROM songs WHERE id=?", (song_id,))
         conn.commit()
         conn.close()
+
+    @staticmethod
+    def get_song_by_id(song_id):
+        conn = AMSDatabase.get_connection()
+        row = conn.execute("SELECT * FROM songs WHERE id=?", (song_id,)).fetchone()
+        conn.close()
+        return row

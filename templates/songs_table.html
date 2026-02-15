@@ -1,33 +1,4 @@
-<div class="content-section">
-    <h2 class="section-title">Create Song for Artist: {{artist_name}}</h2>
-    
-    <form method="post" action="/songs/create" class="create-user-form">
-        <input type="hidden" name="artist_id" value="{{artist_id}}">
-        
-        <div class="form-grid">
-            <div class="form-group">
-                <input type="text" name="title" class="form-input" placeholder="title" required>
-            </div>
-            
-            <div class="form-group">
-                <input type="text" name="album_name" class="form-input" placeholder="album_name" required>
-            </div>
-            
-            <div class="form-group">
-                <select name="genre" class="form-select" required>
-                    <option value="">Select Genre</option>
-                    <option value="rnb">rnb</option>
-                    <option value="country">country</option>
-                    <option value="classic">classic</option>
-                    <option value="rock">rock</option>
-                    <option value="jazz">jazz</option>
-                </select>
-            </div>
-        </div>
-        
-        <button type="submit" class="submit-btn">Create Song</button>
-    </form>
-</div>
+{{create_song_form}}
 
 <div class="content-section">
     <h2 class="section-title">Songs for Artist: {{artist_name}}</h2>

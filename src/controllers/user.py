@@ -1,5 +1,6 @@
 from src.database.database import AMSDatabase
 from datetime import datetime
+from src.utils.password import hash_password
 
 
 class UserController:
