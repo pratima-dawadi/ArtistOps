@@ -452,3 +452,29 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .auth-link:hover {
     text-decoration: underline;
 }
+
+.pagination {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.page-btn {
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text-dark);
+    background: #fff;
+}
+
+.page-btn.disabled {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.page-meta {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}

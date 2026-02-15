@@ -6,11 +6,16 @@ from src.utils.password import hash_password
 class UserController:
 
     @staticmethod
-    def list_users():
+    def list_users(page=1, page_size=5):
         conn = AMSDatabase.get_connection()
-        rows = conn.execute("SELECT * FROM users ORDER BY id DESC").fetchall()
+        offset = (page - 1) * page_size
+        rows = conn.execute(
+            "SELECT * FROM users ORDER BY id DESC LIMIT ? OFFSET ?",
+            (page_size, offset),
+        ).fetchall()
+        total = conn.execute("SELECT COUNT(*) as count FROM users").fetchone()["count"]
         conn.close()
-        return [dict(row) for row in rows]
+        return [dict(row) for row in rows], total
 
     @staticmethod
     def create_user(data):

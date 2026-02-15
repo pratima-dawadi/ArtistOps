@@ -23,6 +23,8 @@ auth_controller = AuthController()
 song_controller = SongController()
 user_controller = UserController()
 
+PAGE_SIZE = 2
+
 
 class AMSRequestHandler(BaseHTTPRequestHandler):
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,6 +42,29 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
 
     def forbidden(self, message="Forbidden"):
         self.send_html(f"<h3>{message}</h3>", status=HTTPStatus.FORBIDDEN)
+
+    def get_page(self, qs):
+        raw_page = qs.get("page", ["1"])[0]
+        try:
+            page = int(raw_page)
+        except ValueError:
+            return 1
+        return max(1, page)
+
+    def build_pagination(self, base_path, page, total_count):
+        total_pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
+        prev_page = max(1, page - 1)
+        next_page = min(total_pages, page + 1)
+        prev_disabled = "disabled" if page <= 1 else ""
+        next_disabled = "disabled" if page >= total_pages else ""
+
+        return f"""
+        <div class="pagination">
+            <a class="page-btn {prev_disabled}" href="{base_path}&page={prev_page}">Previous</a>
+            <span class="page-meta">Page {page} of {total_pages}</span>
+            <a class="page-btn {next_disabled}" href="{base_path}&page={next_page}">Next</a>
+        </div>
+        """
 
     def has_role(self, user, *roles):
         if not user:
@@ -81,14 +106,14 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             user_info=user_info,
         )
 
-    def render_users_tab(self, user):
+    def render_users_tab(self, user, page):
         if not self.has_role(user, Role.SUPER_ADMIN.value):
             return self.forbidden("Only super_admin can access users tab.")
 
-        users = user_controller.list_users()
+        users, total_count = user_controller.list_users(page=page, page_size=PAGE_SIZE)
 
         rows = ""
-        for index, u in enumerate(users):
+        for index, u in enumerate(users, start=((page - 1) * PAGE_SIZE) + 1):
             rows += f"""
             <tr>
                 <form method="post" action="/users/update" style="display: inline;">
@@ -167,27 +192,31 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             </form>
         </div>
         """
+        pagination = self.build_pagination("/dashboard?tab=users", page, total_count)
 
         table = render_template(
             "users_table.html",
             rows=rows,
             create_form=create_form,
+            pagination=pagination,
         )
         content = render_template("dashboard.html", table=table)
         page_html = self.render_base(user, content, users_active="active")
         return self.send_html(page_html)
 
-    def render_artists_tab(self, user):
+    def render_artists_tab(self, user, page):
         if not self.has_role(user, Role.SUPER_ADMIN.value, Role.ARTIST_MANAGER.value):
             return self.forbidden(
                 "Only super_admin and artist_manager can access artists tab."
             )
 
-        artists = artist_controller.list_artists()
+        artists, total_count = artist_controller.list_artists(
+            page=page, page_size=PAGE_SIZE
+        )
         is_manager = user.get("role") == Role.ARTIST_MANAGER.value
 
         rows = ""
-        for index, a in enumerate(artists, start=1):
+        for index, a in enumerate(artists, start=((page - 1) * PAGE_SIZE) + 1):
             artist_id = a["id"]
             if is_manager:
                 rows += f"""
@@ -253,11 +282,12 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 </form>
             </div>
             """
-
+        pagination = self.build_pagination("/dashboard?tab=artists", page, total_count)
         table = render_template(
             "artists_table.html",
             rows=rows,
             create_form=create_form,
+            pagination=pagination,
         )
         content = render_template("dashboard.html", table=table)
         page_html = self.render_base(user, content, artists_active="active")
@@ -312,11 +342,12 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
 
             default_tab = "users" if role == Role.SUPER_ADMIN.value else "artists"
             tab = qs.get("tab", [default_tab])[0]
+            page = self.get_page(qs)
 
             if tab == "users":
-                return self.render_users_tab(user)
+                return self.render_users_tab(user, page)
             if tab == "artists":
-                return self.render_artists_tab(user)
+                return self.render_artists_tab(user, page)
 
             return self.redirect("/dashboard")
 

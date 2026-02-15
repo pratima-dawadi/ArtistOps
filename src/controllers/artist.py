@@ -7,11 +7,18 @@ from src.utils.password import hash_password
 class ArtistController:
 
     @staticmethod
-    def list_artists():
+    def list_artists(page=1, page_size=5):
         conn = AMSDatabase.get_connection()
-        rows = conn.execute("SELECT * FROM artists").fetchall()
+        offset = (page - 1) * page_size
+        rows = conn.execute(
+            "SELECT * FROM artists ORDER BY id DESC LIMIT ? OFFSET ?",
+            (page_size, offset),
+        ).fetchall()
+        total = conn.execute("SELECT COUNT(*) as count FROM artists").fetchone()[
+            "count"
+        ]
         conn.close()
-        return rows
+        return rows, total
 
     @staticmethod
     def get_artist_by_id(artist_id):
