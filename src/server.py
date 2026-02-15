@@ -41,6 +41,7 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         qs = parse_qs(parsed.query)
+        user = get_user_from_session(self)
 
         if path == "/static/style.css":
             css_path = os.path.join(self.BASE_DIR, "static", "style.css")
@@ -56,21 +57,20 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(css.encode("utf-8"))
             return
 
+        if path == "/":
+            if user:
+                return self.redirect("/dashboard")
+            return self.redirect("/login")
+
         if path == "/login":
-            html = render_template("login.html")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html")
-            self.end_headers()
-            self.wfile.write(html.encode("utf-8"))
-            return
+            if user:
+                return self.redirect("/dashboard")
+            return self.send_html(render_template("login.html"))
 
         if path == "/register":
-            html = render_template("register.html")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html")
-            self.end_headers()
-            self.wfile.write(html.encode("utf-8"))
-            return
+            if user:
+                return self.redirect("/dashboard")
+            return self.send_html(render_template("register.html"))
 
         if path == "/dashboard":
             if not require_login(self):
