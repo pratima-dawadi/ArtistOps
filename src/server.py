@@ -488,9 +488,12 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 return self.redirect("/dashboard")
             success, result = auth_controller.register_user(form)
             if not success:
-                self.send_response(HTTPStatus.SEE_OTHER)
-                self.send_header("Location", "/register")
+                self.send_response(HTTPStatus.BAD_REQUEST)
+                self.send_header("Content-type", "text/html")
                 self.end_headers()
+                self.wfile.write(
+                    f"<h3>Registration Error: {result}</h3><a href='/register'>Try again</a>".encode()
+                )
                 return
             self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "/login")

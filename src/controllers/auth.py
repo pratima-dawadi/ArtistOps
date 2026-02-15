@@ -2,7 +2,7 @@ from datetime import datetime
 
 from src.database.database import AMSDatabase
 from src.utils.password import hash_password, verify_password
-from src.utils.validate import valid_email
+from src.utils.validate import valid_email, valid_dob, valid_password, valid_phone
 
 
 class AuthController:
@@ -11,12 +11,27 @@ class AuthController:
         conn = AMSDatabase.get_connection()
         email = data.get("email", "").strip().lower()
         password = data.get("password", "").strip()
+        phone = data.get("phone", "").strip()
+        dob = data.get("dob")
 
         if not email or not password:
             return False, "Email and password are required."
 
         if not valid_email(email):
             return False, "Invalid email format."
+
+        if not valid_password(password):
+            return (
+                False,
+                "Password must be 8+ chars with uppercase, lowercase, and number.",
+            )
+
+        if phone:
+            if not valid_phone(phone):
+                return False, "Phone number must be exactly 10 digits."
+
+        if not valid_dob(dob):
+            return False, "You must be at least 15 years old to register."
 
         existing = conn.execute(
             "SELECT id FROM users WHERE email = ?", (email,)
