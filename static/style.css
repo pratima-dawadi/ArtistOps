@@ -517,3 +517,23 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     color: var(--text-muted);
     font-size: 0.9rem;
 }
+
+.alert {
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    font-size: 0.92rem;
+}
+
+.alert-error {
+    background: #fdeaea;
+    border-color: #e6bcbc;
+    color: #8a1f1f;
+}
+
+.alert-success {
+    background: #eaf8ee;
+    border-color: #b9dec3;
+    color: #1f6b33;
+}

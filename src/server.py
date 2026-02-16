@@ -1,10 +1,11 @@
 import cgi
 import csv
+import html
 import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from io import StringIO
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from src.controllers.artist import ArtistController
 from src.controllers.auth import AuthController
@@ -53,6 +54,28 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
         except ValueError:
             return 1
         return max(1, page)
+
+    def get_query_value(self, qs, key):
+        value = qs.get(key, [""])[0]
+        return value.strip()
+
+    def build_alert_html(self, message, level="error"):
+        if not message:
+            return ""
+        safe_message = html.escape(message)
+        level_class = "alert-error" if level == "error" else "alert-success"
+        return f'<div class="alert {level_class}">{safe_message}</div>'
+
+    def redirect_with_message(self, path, error=None, success=None):
+        params = {}
+        if error:
+            params["error"] = error
+        if success:
+            params["success"] = success
+        if not params:
+            return self.redirect(path)
+        separator = "&" if "?" in path else "?"
+        return self.redirect(f"{path}{separator}{urlencode(params)}")
 
     def build_pagination(self, base_path, page, total_count):
         total_pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
@@ -109,7 +132,7 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             user_info=user_info,
         )
 
-    def render_users_tab(self, user, page):
+    def render_users_tab(self, user, page, error_message="", success_message=""):
         if not self.has_role(user, Role.SUPER_ADMIN.value):
             return self.forbidden("Only super_admin can access users tab.")
 
@@ -197,17 +220,22 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
         """
         pagination = self.build_pagination("/dashboard?tab=users", page, total_count)
 
+        alert_html = self.build_alert_html(
+            error_message, "error"
+        ) or self.build_alert_html(success_message, "success")
+
         table = render_template(
             "users_table.html",
             rows=rows,
             create_form=create_form,
             pagination=pagination,
+            alert_html=alert_html,
         )
         content = render_template("dashboard.html", table=table)
         page_html = self.render_base(user, content, users_active="active")
         return self.send_html(page_html)
 
-    def render_artists_tab(self, user, page):
+    def render_artists_tab(self, user, page, error_message="", success_message=""):
         if not self.has_role(user, Role.SUPER_ADMIN.value, Role.ARTIST_MANAGER.value):
             return self.forbidden(
                 "Only super_admin and artist_manager can access artists tab."
@@ -301,12 +329,17 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             </div>
             """
         pagination = self.build_pagination("/dashboard?tab=artists", page, total_count)
+        alert_html = self.build_alert_html(
+            error_message, "error"
+        ) or self.build_alert_html(success_message, "success")
+
         table = render_template(
             "artists_table.html",
             rows=rows,
             create_form=create_form,
             csv_controls=csv_controls,
             pagination=pagination,
+            alert_html=alert_html,
         )
         content = render_template("dashboard.html", table=table)
         page_html = self.render_base(user, content, artists_active="active")
@@ -340,12 +373,26 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
         if path == "/login":
             if user:
                 return self.redirect("/dashboard")
-            return self.send_html(render_template("login.html"))
+            error_message = self.get_query_value(qs, "error")
+            success_message = self.get_query_value(qs, "success")
+            return self.send_html(
+                render_template(
+                    "login.html",
+                    error_html=self.build_alert_html(error_message, "error"),
+                    success_html=self.build_alert_html(success_message, "success"),
+                )
+            )
 
         if path == "/register":
             if user:
                 return self.redirect("/dashboard")
-            return self.send_html(render_template("register.html"))
+            error_message = self.get_query_value(qs, "error")
+            return self.send_html(
+                render_template(
+                    "register.html",
+                    error_html=self.build_alert_html(error_message, "error"),
+                )
+            )
 
         if path == "/dashboard":
             if not require_login(self):
@@ -362,11 +409,15 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             default_tab = "users" if role == Role.SUPER_ADMIN.value else "artists"
             tab = qs.get("tab", [default_tab])[0]
             page = self.get_page(qs)
+            error_message = self.get_query_value(qs, "error")
+            success_message = self.get_query_value(qs, "success")
 
             if tab == "users":
-                return self.render_users_tab(user, page)
+                return self.render_users_tab(user, page, error_message, success_message)
             if tab == "artists":
-                return self.render_artists_tab(user, page)
+                return self.render_artists_tab(
+                    user, page, error_message, success_message
+                )
 
             return self.redirect("/dashboard")
 
@@ -384,6 +435,8 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 return
 
             artist_name = artist["stage_name"]
+            error_message = self.get_query_value(qs, "error")
+            success_message = self.get_query_value(qs, "success")
 
             songs = song_controller.list_artist_song(artist_id)
 
@@ -487,6 +540,8 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 artist_name=artist_name,
                 artist_id=artist_id,
                 create_song_form=create_song_form,
+                alert_html=self.build_alert_html(error_message, "error")
+                or self.build_alert_html(success_message, "success"),
             )
             html_page = self.render_base(user, content, artists_active="active")
 
@@ -554,21 +609,35 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             )
 
             if "file" not in multipart_form:
-                return self.redirect("/dashboard?tab=artists")
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists", error="Please select a CSV file."
+                )
 
             file_item = multipart_form["file"]
 
             if not getattr(file_item, "filename", ""):
-                return self.redirect("/dashboard?tab=artists")
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists", error="Please select a CSV file."
+                )
 
             csv_bytes = file_item.file.read()
             if not csv_bytes:
-                return self.redirect("/dashboard?tab=artists")
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists", error="Uploaded CSV file is empty."
+                )
 
-            csv_text = csv_bytes.decode("utf-8-sig", errors="ignore")
-            rows = list(csv.DictReader(StringIO(csv_text)))
-            artist_controller.import_artists(rows)
-            return self.redirect("/dashboard?tab=artists")
+            try:
+                csv_text = csv_bytes.decode("utf-8-sig", errors="ignore")
+                rows = list(csv.DictReader(StringIO(csv_text)))
+                artist_controller.import_artists(rows)
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists",
+                    success="Artists imported successfully.",
+                )
+            except Exception as e:
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists", error=f"Artist import failed: {e}"
+                )
 
         form = parse_post_body(self)
 
@@ -577,17 +646,10 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 return self.redirect("/dashboard")
             success, result = auth_controller.register_user(form)
             if not success:
-                self.send_response(HTTPStatus.BAD_REQUEST)
-                self.send_header("Content-type", "text/html")
-                self.end_headers()
-                self.wfile.write(
-                    f"<h3>Registration Error: {result}</h3><a href='/register'>Try again</a>".encode()
-                )
-                return
-            self.send_response(HTTPStatus.SEE_OTHER)
-            self.send_header("Location", "/login")
-            self.end_headers()
-            return
+                return self.redirect_with_message("/register", error=f"{result}")
+            return self.redirect_with_message(
+                "/login", success="Registration successful. Please login."
+            )
 
         if path == "/login":
             if user:
@@ -595,13 +657,7 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             success, result = auth_controller.login_user(form)
 
             if not success:
-                self.send_response(HTTPStatus.UNAUTHORIZED)
-                self.send_header("Content-type", "text/html")
-                self.end_headers()
-                self.wfile.write(
-                    f"<h3>Login Error: {result}</h3><a href='/login'>Try again</a>".encode()
-                )
-                return
+                return self.redirect_with_message("/login", error=f"{result}")
 
             session_id = create_session(result)
             self.send_response(HTTPStatus.SEE_OTHER)
@@ -631,38 +687,80 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
         if path == "/users/create":
             if not self.has_role(user, Role.SUPER_ADMIN.value):
                 return self.forbidden("Only super_admin can create users.")
-            user_controller.create_user(form)
-            return self.redirect("/dashboard?tab=users")
+            try:
+                user_controller.create_user(form)
+                return self.redirect_with_message(
+                    "/dashboard?tab=users", success="User created successfully."
+                )
+            except Exception as e:
+                return self.redirect_with_message(
+                    "/dashboard?tab=users", error=f"User creation failed: {e}"
+                )
 
         if path == "/users/delete":
             if not self.has_role(user, Role.SUPER_ADMIN.value):
                 return self.forbidden("Only super_admin can delete users.")
-            user_controller.delete_user(form["id"])
-            return self.redirect("/dashboard?tab=users")
+            try:
+                user_controller.delete_user(form["id"])
+                return self.redirect_with_message(
+                    "/dashboard?tab=users", success="User deleted successfully."
+                )
+            except Exception as e:
+                return self.redirect_with_message(
+                    "/dashboard?tab=users", error=f"User delete failed: {e}"
+                )
 
         if path == "/users/update":
             if not self.has_role(user, Role.SUPER_ADMIN.value):
                 return self.forbidden("Only super_admin can update users.")
-            user_controller.update_user(form)
-            return self.redirect("/dashboard?tab=users")
+            try:
+                user_controller.update_user(form)
+                return self.redirect_with_message(
+                    "/dashboard?tab=users", success="User updated successfully."
+                )
+            except Exception as e:
+                return self.redirect_with_message(
+                    "/dashboard?tab=users", error=f"User update failed: {e}"
+                )
 
         if path == "/artists/create":
             if not self.has_role(user, Role.ARTIST_MANAGER.value):
                 return self.forbidden("Only artist_manager can create artists.")
-            artist_controller.create_artist(form)
-            return self.redirect("/dashboard?tab=artists")
+            try:
+                artist_controller.create_artist(form)
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists", success="Artist created successfully."
+                )
+            except Exception as e:
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists", error=f"Artist creation failed: {e}"
+                )
 
         if path == "/artists/update":
             if not self.has_role(user, Role.ARTIST_MANAGER.value):
                 return self.forbidden("Only artist_manager can update artists.")
-            artist_controller.update_artist(form)
-            return self.redirect("/dashboard?tab=artists")
+            try:
+                artist_controller.update_artist(form)
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists", success="Artist updated successfully."
+                )
+            except Exception as e:
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists", error=f"Artist update failed: {e}"
+                )
 
         if path == "/artists/delete":
             if not self.has_role(user, Role.ARTIST_MANAGER.value):
                 return self.forbidden("Only artist_manager can delete artists.")
-            artist_controller.delete_artist(form["id"])
-            return self.redirect("/dashboard?tab=artists")
+            try:
+                artist_controller.delete_artist(form["id"])
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists", success="Artist deleted successfully."
+                )
+            except Exception as e:
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists", error=f"Artist delete failed: {e}"
+                )
 
         if path == "/songs/create":
             artist_id = form.get("artist_id")
@@ -679,10 +777,20 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
 
             for field in required_fields:
                 if not form.get(field):
-                    return self.redirect(f"/artists/{artist_id}/songs")
+                    return self.redirect_with_message(
+                        f"/artists/{artist_id}/songs",
+                        error=f"{field} is required to create song.",
+                    )
 
-            song_controller.create_song(form)
-            return self.redirect(f"/artists/{artist_id}/songs")
+            try:
+                song_controller.create_song(form)
+                return self.redirect_with_message(
+                    f"/artists/{artist_id}/songs", success="Song created successfully."
+                )
+            except Exception as e:
+                return self.redirect_with_message(
+                    f"/artists/{artist_id}/songs", error=f"Song creation failed: {e}"
+                )
 
         if path == "/songs/update":
             if not self.has_role(user, Role.ARTIST.value):
@@ -695,8 +803,17 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 )
 
             form["artist_id"] = str(song["artist_id"])
-            song_controller.update_song(form)
-            return self.redirect(f"/artists/{form['artist_id']}/songs")
+            try:
+                song_controller.update_song(form)
+                return self.redirect_with_message(
+                    f"/artists/{form['artist_id']}/songs",
+                    success="Song updated successfully.",
+                )
+            except Exception as e:
+                return self.redirect_with_message(
+                    f"/artists/{form['artist_id']}/songs",
+                    error=f"Song update failed: {e}",
+                )
 
         if path == "/songs/delete":
             if not self.has_role(user, Role.ARTIST.value):
@@ -709,8 +826,17 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 )
 
             artist_id = song["artist_id"]
-            song_controller.delete_song(form["id"])
-            return self.redirect(f"/artists/{artist_id}/songs")
+            try:
+                song_controller.delete_song(form["id"])
+                return self.redirect_with_message(
+                    f"/artists/{artist_id}/songs",
+                    success="Song deleted successfully.",
+                )
+            except Exception as e:
+                return self.redirect_with_message(
+                    f"/artists/{artist_id}/songs",
+                    error=f"Song delete failed: {e}",
+                )
 
         self.send_error(HTTPStatus.NOT_FOUND, "Not found")
         return

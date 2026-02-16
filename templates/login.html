@@ -8,6 +8,8 @@
 
 <div class="auth-card">
     <h2 class="auth-title">Login</h2>
+    {{error_html}}
+    {{success_html}}
 
     <form method="POST" action="/login" class="create-user-form auth-form">
         <input type="email" name="email" class="form-input" placeholder="Email" required>
