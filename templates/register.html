@@ -15,9 +15,10 @@
         <input type="text" name="first_name" class="form-input" placeholder="First Name" required>
         <input type="text" name="last_name" class="form-input" placeholder="Last Name" required>
         <input type="email" name="email" class="form-input" placeholder="Email" required>
-        <input type="password" name="password" class="form-input" placeholder="Password" required>
-        <input type="text" name="phone" class="form-input" placeholder="Phone">
-        <input type="date" name="dob" class="form-input">
+        <input type="password" name="password" class="form-input" placeholder="Password" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}" title="At least 8 characters with uppercase, lowercase, and number."required>
+        <input type="text" name="phone" class="form-input" placeholder="Phone" pattern="\d{10}" title="Enter a valid 10-digit phone number.">
+        <p class="form-note">Date of Birth </p>
+        <input type="date" name="dob" class="form-input" placeholder="Date of Birth" required>
         
         <select name="gender" class="form-select">
             <option value="">Select Gender</option>

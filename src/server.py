@@ -21,6 +21,10 @@ from src.utils.session import (
     require_login,
 )
 from src.utils.template import parse_post_body, render_template
+from src.utils.validate import (
+    validate_artist_create_form,
+    validate_user_create_form,
+)
 
 artist_controller = ArtistController()
 auth_controller = AuthController()
@@ -201,8 +205,8 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                     <div class="form-group"><input type="text" name="first_name" class="form-input" placeholder="first_name" required></div>
                     <div class="form-group"><input type="text" name="last_name" class="form-input" placeholder="last_name" required></div>
                     <div class="form-group"><input type="email" name="email" class="form-input" placeholder="email" required></div>
-                    <div class="form-group"><input type="password" name="password" class="form-input" placeholder="password" required></div>
-                    <div class="form-group"><input type="text" name="phone" class="form-input" placeholder="phone" required></div>
+                    <div class="form-group"><input type="password" name="password" class="form-input" placeholder="password" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}" title="At least 8 characters with uppercase, lowercase, and number." required></div>
+                    <div class="form-group"><input type="text" name="phone" class="form-input" placeholder="phone" pattern="\\d{10}" maxlength="10" title="Phone must be exactly 10 digits." required></div>
                 </div>
                 <div class="form-grid">
                     <div class="form-group"><input type="date" name="dob" class="form-input" required></div>
@@ -225,8 +229,8 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                 <div class="form-grid">
                     <div class="form-group" id="artistFields" style="display:none; margin-top:10px;">
                         <input type="text" name="stage_name" placeholder="Stage Name">
-                        <input type="number" name="first_release_year" placeholder="First Release Year">
-                        <input type="number" name="no_of_albums_released" placeholder="No. of Albums Released">
+                        <input type="number" name="first_release_year" placeholder="First Release Year" min="1900" max="2100">
+                        <input type="number" name="no_of_albums_released" placeholder="No. of Albums Released" min="0">
                     </div>
                 </div>
                 <button type="submit" class="submit-btn">Create</button>
@@ -309,8 +313,8 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                         <div class="form-group"><input type="text" name="first_name" class="form-input" placeholder="first_name" required></div>
                         <div class="form-group"><input type="text" name="last_name" class="form-input" placeholder="last_name" required></div>
                         <div class="form-group"><input type="email" name="email" class="form-input" placeholder="email" required></div>
-                        <div class="form-group"><input type="password" name="password" class="form-input" placeholder="password" required></div>
-                        <div class="form-group"><input type="text" name="phone" class="form-input" placeholder="phone" required></div>
+                        <div class="form-group"><input type="password" name="password" class="form-input" placeholder="password" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}" title="At least 8 characters with uppercase, lowercase, and number." required></div>
+                        <div class="form-group"><input type="text" name="phone" class="form-input" placeholder="phone" pattern="\\d{10}" maxlength="10" title="Phone must be exactly 10 digits." required></div>
                     </div>
                     <div class="form-grid">
                         <div class="form-group"><input type="date" name="dob" class="form-input" required></div>
@@ -323,8 +327,8 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                         </div>
                         <div class="form-group"><input type="text" name="address" class="form-input" placeholder="address" required></div>
                         <div class="form-group"><input type="text" name="stage_name" class="form-input" placeholder="stage_name" required></div>
-                        <div class="form-group"><input type="number" name="first_release_year" class="form-input" placeholder="first_release_year" required></div>
-                        <div class="form-group"><input type="number" name="no_of_albums_released" class="form-input" placeholder="no_of_albums_released" required></div>
+                        <div class="form-group"><input type="number" name="first_release_year" class="form-input" placeholder="first_release_year" min="1900" max="2100" required></div>
+                        <div class="form-group"><input type="number" name="no_of_albums_released" class="form-input" placeholder="no_of_albums_released" min="0" required></div>
                     </div>
                     <button type="submit" class="submit-btn">Create Artist</button>
                 </form>
@@ -701,6 +705,13 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
         if path == "/users/create":
             if not self.has_role(user, Role.SUPER_ADMIN.value):
                 return self.forbidden("Only super_admin can create users.")
+
+            validation_error = validate_user_create_form(form)
+            if validation_error:
+                return self.redirect_with_message(
+                    "/dashboard?tab=users", error=validation_error
+                )
+
             try:
                 user_controller.create_user(form)
                 return self.redirect_with_message(
@@ -740,6 +751,13 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
         if path == "/artists/create":
             if not self.has_role(user, Role.ARTIST_MANAGER.value):
                 return self.forbidden("Only artist_manager can create artists.")
+
+            validation_error = validate_artist_create_form(form)
+            if validation_error:
+                return self.redirect_with_message(
+                    "/dashboard?tab=artists", error=validation_error
+                )
+
             try:
                 artist_controller.create_artist(form)
                 return self.redirect_with_message(
