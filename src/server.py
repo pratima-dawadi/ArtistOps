@@ -47,6 +47,21 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
     def forbidden(self, message="Forbidden"):
         self.send_html(f"<h3>{message}</h3>", status=HTTPStatus.FORBIDDEN)
 
+    def not_found(self, message="Nothing matches the given URI.", path=None):
+        user = get_user_from_session(self)
+        back_href = "/dashboard" if user else "/login"
+        back_label = "Back to Dashboard" if user else "Back to Login"
+        current_path = path or urlparse(self.path).path
+
+        page_html = render_template(
+            "not_found.html",
+            message=html.escape(message),
+            path=html.escape(current_path),
+            back_href=back_href,
+            back_label=back_label,
+        )
+        self.send_html(page_html, status=HTTPStatus.NOT_FOUND)
+
     def get_page(self, qs):
         raw_page = qs.get("page", ["1"])[0]
         try:
@@ -585,8 +600,7 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(csv_data.encode("utf-8"))
             return
 
-        self.send_error(HTTPStatus.NOT_FOUND, "Not found")
-        return
+        return self.not_found(path=path)
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -838,5 +852,4 @@ class AMSRequestHandler(BaseHTTPRequestHandler):
                     error=f"Song delete failed: {e}",
                 )
 
-        self.send_error(HTTPStatus.NOT_FOUND, "Not found")
-        return
+        return self.not_found(path=path)

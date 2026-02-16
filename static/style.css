@@ -537,3 +537,56 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     border-color: #b9dec3;
     color: #1f6b33;
 }
+
+.not-found-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background:
+        radial-gradient(circle at 15% 20%, rgba(198, 40, 40, 0.08), transparent 35%),
+        radial-gradient(circle at 85% 80%, rgba(13, 122, 130, 0.1), transparent 40%),
+        var(--bg-cream);
+}
+
+.not-found-card {
+    width: 100%;
+    max-width: 640px;
+    background: var(--bg-white);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md);
+    padding: 2rem 1.5rem;
+    text-align: center;
+}
+
+.not-found-code {
+    font-size: 4rem;
+    line-height: 1;
+    color: var(--danger-red);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.not-found-title {
+    margin-bottom: 0.75rem;
+    color: var(--text-dark);
+}
+
+.not-found-message {
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.not-found-path {
+    color: var(--text-muted);
+    margin-bottom: 1.25rem;
+    word-break: break-word;
+}
+
+.not-found-btn {
+    display: inline-block;
+    width: auto;
+    text-decoration: none;
+}
